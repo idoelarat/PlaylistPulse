@@ -70,35 +70,6 @@ async def callback(request: Request):
             "https://accounts.spotify.com/api/token", data=payload, headers=headers
         )
         tokens = token_response.json()
-        access_token = tokens.get("access_token")
-
-        # 2. Fetch data using the new token
-        user_headers = {"Authorization": f"Bearer {access_token}"}
-
-        user_response = await client.get(
-            "https://api.spotify.com/v1/me", headers=user_headers
-        )
-        user_data = user_response.json()
-
-        playlist_response = await client.get(
-            "https://api.spotify.com/v1/me/playlists?&limit=1",
-            headers=user_headers,
-        )
-        user_playlist = playlist_response.json()
-
-        tracks_response = await client.get(
-            "https://api.spotify.com/v1/me/tracks?limit=1", headers=user_headers
-        )
-        user_tracks = tracks_response.json()
-
-        # 3. Print Basic data to your terminal
-        user_name = user_data.get("display_name", "Unknown User")
-        user_playlists_total = user_playlist.get("total", 0)
-        user_total_saved = user_tracks.get("total", 0)
-
-        print(f"\n🚀 Successfully connected to: {user_name}")
-        print(f"📊 Playlists: {user_playlists_total}")
-        print(f"🎵 Saved Tracks: {user_total_saved}\n")
 
         # Save tokens as you did before
         with open(".tokens.json", "w") as f:

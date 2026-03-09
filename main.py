@@ -1,13 +1,14 @@
 import typer
 import uvicorn
 import os
+import multiprocessing
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich import box
 from dotenv import set_key, load_dotenv
 from auth import app as fastapi_app
-from spotify_client import get_spotify_user_name
+import spotify_client
 
 ENV_FILE = ".env"
 
@@ -46,6 +47,7 @@ def print_big_banner():
         )
     )
 
+
 def login_link(port: int = 8888, host: str = "127.0.0.1"):
     console.print(
         Panel(
@@ -56,6 +58,9 @@ def login_link(port: int = 8888, host: str = "127.0.0.1"):
         )
     )
 
+def organize_by():
+    console.print("\n[bold]How To Organize the songs?[/bold]")
+    orginze_var: int = typer.prompt("Please Enter")
 
 @cli.command()
 def start(port: int = 8888, host: str = "127.0.0.1"):
@@ -64,17 +69,37 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     """
     console.clear()
     print_big_banner()
-    set_env()
+
+    if not typer.confirm("If The Tokens You add before are ok Press Y"):
+        if os.path.exists(".tokens.json"):
+            os.remove(".tokens.json")
+        set_env()
+    
+    proc = multiprocessing.Process(
+        target=uvicorn.run,
+        args=(fastapi_app,),
+        kwargs={"host": host, "port": port, "log_level": "error"},
+        daemon=True
+    )
+    proc.start()
+
     console.clear()
     print_big_banner()
     login_link(port, host)
+    if not typer.confirm("Did you get access?"):
+        console.clear()
+        console.print("[bold red]Exiting CLI... Goodbye![/]")
+        exit()
+        
 
-    if not os.getenv("SPOTIFY_CLIENT_ID"):
-        console.print("[bold red]Error:[/bold red] SPOTIFY_CLIENT_ID is missing!")
-        raise typer.Exit(code=1)
-
-    uvicorn.run(fastapi_app, host=host, port=port, log_level="error", access_log=False)
-
-
+    console.clear()
+    print_big_banner()
+    if not os.path.exists(".tokens.json"):
+        console.print("[bold red]Credentials are not good[/]")
+        exit()
+    console.print(f"[bold cyan]Logged In To:[/] [bold]{spotify_client.get_spotify_user_name()}[/]")
+    console.print(f"[bold cyan]Total Saved Songs:[/] [white]{spotify_client.get_total_saved_songs()}[/]")
+    organize_by()
+    
 if __name__ == "__main__":
     cli()

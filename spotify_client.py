@@ -25,6 +25,18 @@ def get_spotify_user_name():
         return response.json().get("display_name")
     return f"Failed: {response.status_code}"
 
+def get_total_saved_songs():
+    headers = get_auth_headers()
+    if not headers:
+        return "Error: Could not retrieve headers."
+
+    url = "https://api.spotify.com/v1/me/tracks"
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        return response.json().get("total")
+    return f"Failed: {response.status_code}"
+
 if __name__ == "__main__":
     name = get_spotify_user_name()
     
