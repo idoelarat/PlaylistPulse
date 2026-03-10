@@ -1,5 +1,9 @@
 fastapi
-uvicorn
 httpx
+uvicorn
 python-dotenv
 google-genai
+pydantic
+typer
+rich
+requests
