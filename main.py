@@ -86,7 +86,7 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     console.clear()
     print_big_banner()
     login_link(port, host)
-    if not typer.confirm("Did you get access?"):
+    if not typer.confirm("Did you get access? (Opend Than Closed)"):
         console.clear()
         console.print("[bold red]Exiting CLI... Goodbye![/]")
         exit()
