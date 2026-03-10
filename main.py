@@ -1,6 +1,7 @@
 import typer
 import uvicorn
 import os
+import sys
 import multiprocessing
 import time
 from rich.console import Console
@@ -8,12 +9,18 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
 from rich import box
+from pathlib import Path
 from dotenv import set_key, load_dotenv
 from auth import app as fastapi_app
 import spotify_client
-import gemini_tool
 
-ENV_FILE = ".env"
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+
+ENV_FILE = str(BASE_DIR / ".env")
+TOKEN_FILE = str(BASE_DIR / ".tokens.json")
 
 console = Console()
 cli = typer.Typer(rich_markup_mode="rich")
@@ -106,6 +113,7 @@ def fetch_songs():
 
 
 def process_gemini_and_spotify(num: int, songs):
+    import gemini_tool
     if num == 1:
         status_msg = "[bold yellow]Organizing By Mood... Please Wait It might take time"
         prompt = gemini_tool.PROMPT_TEMPLATE_MOOD
@@ -192,4 +200,5 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     cli()
