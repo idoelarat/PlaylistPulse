@@ -2,6 +2,7 @@ import typer
 import uvicorn
 import os
 import multiprocessing
+import time
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -49,18 +50,26 @@ def print_big_banner():
 
 
 def login_link(port: int = 8888, host: str = "127.0.0.1"):
+
     console.print(
         Panel(
             f"🚀 [bold]Starting Spotify Connector[/bold]\n"
             f"Click On This URL 👉: [cyan]http://{host}:{port}/login[/cyan]",
-            expand=True,
+            expand=False,
             border_style="green",
         )
     )
 
+
 def organize_by():
-    console.print("\n[bold]How To Organize the songs?[/bold]")
-    orginze_var: int = typer.prompt("Please Enter")
+    while True:
+        console.print("\n[bold]How To Organize the songs?\n1 - Mood | 2 - Genre[/bold]")
+        organize_var = typer.prompt("Please Enter a Number")
+
+        if organize_var in ["1", "2"]:
+            return int(organize_var)
+        console.print("[red]Invalid choice. Please enter 1 or 2.[/red]")
+
 
 @cli.command()
 def start(port: int = 8888, host: str = "127.0.0.1"):
@@ -70,36 +79,42 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     console.clear()
     print_big_banner()
 
-    if not typer.confirm("If The Tokens You add before are ok Press Y"):
-        if os.path.exists(".tokens.json"):
-            os.remove(".tokens.json")
+    if typer.confirm("Want to change tokens?",default=False):
         set_env()
-    
+
+    if os.path.exists(".tokens.json"):
+        os.remove(".tokens.json")
+
     proc = multiprocessing.Process(
         target=uvicorn.run,
         args=(fastapi_app,),
         kwargs={"host": host, "port": port, "log_level": "error"},
-        daemon=True
+        daemon=True,
     )
     proc.start()
 
     console.clear()
     print_big_banner()
     login_link(port, host)
-    if not typer.confirm("Did you get access? (Opend Than Closed)"):
-        console.clear()
-        console.print("[bold red]Exiting CLI... Goodbye![/]")
-        exit()
-        
+    with console.status(
+        "[bold yellow]Waiting for Spotify authentication...", spinner="dots"
+    ):
+        while not os.path.exists(".tokens.json"):
+            time.sleep(0.5)
 
     console.clear()
     print_big_banner()
     if not os.path.exists(".tokens.json"):
         console.print("[bold red]Credentials are not good[/]")
         exit()
-    console.print(f"[bold cyan]Logged In To:[/] [bold]{spotify_client.get_spotify_user_name()}[/]")
-    console.print(f"[bold cyan]Total Saved Songs:[/] [white]{spotify_client.get_total_saved_songs()}[/]")
+    console.print(
+        f"[bold cyan]Logged In To:[/] [bold]{spotify_client.get_spotify_user_name()}[/]"
+    )
+    console.print(
+        f"[bold cyan]Total Saved Songs:[/] [white]{spotify_client.get_total_saved_songs()}[/]"
+    )
     organize_by()
-    
+
+
 if __name__ == "__main__":
     cli()

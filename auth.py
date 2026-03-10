@@ -65,17 +65,14 @@ async def callback(request: Request):
     }
 
     async with httpx.AsyncClient() as client:
-        # 1. Exchange code for Access Token
         token_response = await client.post(
             "https://accounts.spotify.com/api/token", data=payload, headers=headers
         )
         tokens = token_response.json()
 
-        # Save tokens as you did before
         with open(".tokens.json", "w") as f:
             json.dump(tokens, f)
 
-        # Return a simple string instead of HTML
         return HTMLResponse(content="<script>window.close();</script>")
 
 
