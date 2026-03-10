@@ -43,9 +43,9 @@ class MusicConfig:
 
 class Playlist(BaseModel):
     name: str = Field(
-        description="The category name (e.g., 'Hebrew Mizrahi' or 'Mood: Uplifting')"
+        description="The category name following the strict naming rules."
     )
-    ids: List[str] = Field(description="List of song IDs belonging to this category")
+    ids: List[str]
 
 
 class LibraryClassification(BaseModel):
@@ -53,24 +53,30 @@ class LibraryClassification(BaseModel):
 
 
 PROMPT_TEMPLATE_MOOD = """
-You are a professional music curator. Categorize the provided songs into TWO types of buckets.
+You are a professional music curator. 
+TASK: Categorize the provided songs into mood buckets.
 
-RULES:
-1. MOOD BUCKETS: Use ONLY the mood name from this list: {moods}. 
-   Prefix these with 'Mood: '.
+STRICT RULES:
+1. You MUST ONLY use moods from this list: {moods}.
+2. Every bucket name must follow the format: "Mood: <MOOD_NAME>".
+3. Do not create any moods that are not in the provided list.
 
-SONGS:
+SONGS TO CATEGORIZE:
 {songs_json}
 """
 
 PROMPT_TEMPLATE_GENERE = """
-You are a professional music curator. Categorize the provided songs into TWO types of buckets.
+You are a professional music curator.
+TASK: Categorize the provided songs by Language and Genre.
 
-RULES:
-1. GENRE BUCKETS: Combine the Language + Genre (e.g., "Hebrew Mizrahi", "English Rock"). 
-   Use {global_genres} or {israeli_genres} for the genre part.
+STRICT RULES:
+1. Every bucket name MUST be formatted as: "Language Genre" (e.g., "English Rock" or "Hebrew Mizrahi").
+2. For the 'Genre' part:
+   - If the song is Hebrew/Israeli, use ONLY: {israeli_genres}.
+   - For all other languages, use ONLY: {global_genres}.
+3. Do not invent new genres. Pick the closest match from the lists provided.
 
-SONGS:
+SONGS TO CATEGORIZE:
 {songs_json}
 """
 
@@ -83,16 +89,17 @@ def classify_library(song_list, prompt_template, batch_size=20):
 
     for i in range(0, len(song_list), batch_size):
         batch = song_list[i : i + batch_size]
-        
-        simplified_batch = [{"id": s["id"], "name": s["name"], "artist": s["artist"]} for s in batch]
-        
+
+        simplified_batch = [
+            {"id": s["id"], "name": s["name"], "artist": s["artist"]} for s in batch
+        ]
+
         formatted_prompt = prompt_template.format(
             global_genres=MusicConfig.GLOBAL_GENRES,
             israeli_genres=MusicConfig.ISRAELI_GENRES,
             moods=MusicConfig.MOODS,
             songs_json=json.dumps(simplified_batch),
         )
-
 
         max_retries = 3
         for attempt in range(max_retries):
@@ -105,23 +112,30 @@ def classify_library(song_list, prompt_template, batch_size=20):
                         "response_json_schema": LibraryClassification.model_json_schema(),
                     },
                 )
-                
+
                 if response.text:
                     data = LibraryClassification.model_validate_json(response.text)
                     for p in data.playlists:
                         all_playlists.setdefault(p.name, []).extend(p.ids)
-                break 
+                break
 
             except Exception as e:
                 if "503" in str(e) and attempt < max_retries - 1:
-                    print(f"⚠️ Server busy, retrying batch {i//batch_size + 1} (Attempt {attempt + 1})...")
+                    print(
+                        f"⚠️ Server busy, retrying batch {i//batch_size + 1} (Attempt {attempt + 1})..."
+                    )
                     time.sleep(2)
                     continue
-                raise e 
+                raise e
 
         time.sleep(1)
 
-    return {"playlists": [{"name": k, "ids": list(set(v))} for k, v in all_playlists.items()]}
+    return {
+        "playlists": [
+            {"name": k, "ids": list(set(v))} for k, v in all_playlists.items()
+        ]
+    }
+
 
 if __name__ == "__main__":
     print("🧪 Testing Gemini Classification...")

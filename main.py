@@ -41,6 +41,15 @@ def set_env():
 
     console.print("[green]✓ Credentials saved to .env and loaded![/green]")
 
+def hard_clear():
+    """Wipes the terminal and the scrollback buffer."""
+    console.clear() 
+    
+    if os.name == 'nt':  # Windows
+        os.system('cls')
+    else:               # Mac / Linux
+        sys.stdout.write('\033[H\033[2J\033[3J')
+        sys.stdout.flush()
 
 def print_big_banner():
     title = Text()
@@ -157,7 +166,7 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     """
     [bold green]Start[/bold green] the Spotify Auth Server.
     """
-    console.clear()
+    hard_clear()
     print_big_banner()
 
     if typer.confirm("Want to change tokens?", default=False):
@@ -174,7 +183,7 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     )
     proc.start()
 
-    console.clear()
+    hard_clear()
     print_big_banner()
     login_link(port, host)
     with console.status(
@@ -183,7 +192,7 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
         while not os.path.exists(".tokens.json"):
             time.sleep(0.5)
 
-    console.clear()
+    hard_clear()
     print_big_banner()
     if not os.path.exists(".tokens.json"):
         console.print("[bold red]Credentials are not good[/]")
@@ -196,7 +205,8 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     )
     songs = fetch_songs()
     gemini_songs = process_gemini_and_spotify(organize_by(), test_songs)
-    console.print(gemini_songs) 
+    console.print(gemini_songs)
+
 
 
 if __name__ == "__main__":
