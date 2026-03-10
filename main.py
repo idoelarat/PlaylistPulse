@@ -7,14 +7,14 @@ import time
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-from rich.table import Table
 from rich import box
 from pathlib import Path
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from dotenv import set_key, load_dotenv
 from auth import app as fastapi_app
 import spotify_client
 
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).parent
 else:
     BASE_DIR = Path(__file__).resolve().parent
@@ -41,15 +41,17 @@ def set_env():
 
     console.print("[green]✓ Credentials saved to .env and loaded![/green]")
 
+
 def hard_clear():
     """Wipes the terminal and the scrollback buffer."""
-    console.clear() 
-    
-    if os.name == 'nt':  # Windows
-        os.system('cls')
-    else:               # Mac / Linux
-        sys.stdout.write('\033[H\033[2J\033[3J')
+    console.clear()
+
+    if os.name == "nt":  # Windows
+        os.system("cls")
+    else:  # Mac / Linux
+        sys.stdout.write("\033[H\033[2J\033[3J")
         sys.stdout.flush()
+
 
 def print_big_banner():
     title = Text()
@@ -91,74 +93,67 @@ def organize_by():
 
 def fetch_songs():
     with console.status("[bold yellow]Fetching your library...", spinner="arc"):
-        songs = spotify_client.all_saved_songs()
+        all_songs = spotify_client.all_saved_songs()
 
-    if not isinstance(songs, list):
+    if not isinstance(all_songs, list):
         console.print(
             "[red]❌ Could not load songs. Please check your connection.[/red]"
         )
-        return
+        return []
 
-    table = Table(
-        title="Your Saved Library", show_header=True, header_style="bold magenta"
-    )
-    table.add_column("ID", style="dim", width=22)
-    table.add_column("Song Name", style="cyan")
-    table.add_column("Artist", style="white")
-
-    for s in songs[:10]:
-        table.add_row(
-            str(s.get("id", "N/A")),
-            str(s.get("name", "Unknown")),
-            str(s.get("artist", "Unknown")),
-        )
-
-    console.print(table)
-
-    if len(songs) > 10:
-        console.print(f"[italic]... plus [bold]{len(songs) - 10}[/] more tracks.[/]\n")
-
+    songs = all_songs
     return songs
 
 
-def process_gemini_and_spotify(num: int, songs):
+def select_model():
+    """Direct prompt for the Gemini model name."""
+    console.print(
+        "\n[bold magenta]Which Gemini Model would you like to use?[/bold magenta]"
+    )
+    console.print(
+        "[dim]Common options: gemini-2.0-flash, gemini-2.0-flash-lite-preview-02-05, gemini-1.5-flash[/dim]"
+    )
+
+    model_name = typer.prompt("Model Name", default="gemini-2.0-flash")
+    return model_name
+
+
+def process_gemini_and_spotify(num: int, songs, model_name: str):
     import gemini_tool
-    if num == 1:
-        status_msg = "[bold yellow]Organizing By Mood... Please Wait It might take time"
-        prompt = gemini_tool.PROMPT_TEMPLATE_MOOD
-    else:
-        status_msg = "[bold yellow]Organizing By Genre... Please Wait It might take time"
-        prompt = gemini_tool.PROMPT_TEMPLATE_GENERE
 
-    with console.status(status_msg, spinner="arc"):
-        res = gemini_tool.classify_library(songs, prompt)
+    prompt = gemini_tool.PROMPT_TEMPLATE_MOOD if num == 1 else gemini_tool.PROMPT_TEMPLATE_GENERE
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        
+        task = progress.add_task(f"[yellow]AI is analyzing {len(songs)} songs...", total=len(songs))
+        
+        def update_progress(advance_by=1):
+            progress.advance(task, advance_by)
 
-        count = len(songs)
+        res = gemini_tool.classify_library(
+            songs, 
+            prompt, 
+            model_name=model_name, 
+            progress_callback=update_progress # Pass the function here
+        )
+    count = len(songs)
+    console.print(f"[green]✨ AI successfully processed {count} songs![/green]")
 
-        console.print(f"[green]Successfully processed {count} songs![/green]")
+    with console.status(
+        "[bold blue]Updating your Spotify Playlists...[/bold blue]", spinner="dots"
+    ):
+        spotify_client.sync_playlists(res)
 
+    console.print(
+        "[bold green]✅ All playlists are synced and up to date![/bold green]"
+    )
     return res
-
-
-test_songs = [
-    {
-        "id": "7ouMYWpwJ422jRcDASZB7P",
-        "name": "The Fate of Ophelia",
-        "artist": "Taylor Swift",
-    },
-    {"id": "4VqPOruhp5EdPBeR92t6lQ", "name": "I Just Might", "artist": "Bruno Mars"},
-    {"id": "2takcwOaAZWiXQijPHIx7B", "name": "Azizam", "artist": "Ed Sheeran"},
-    {
-        "id": "1dc4c347-a1db-32aa-b14f",
-        "name": "Beat Yourself Up",
-        "artist": "Charlie Puth",
-    },
-    {
-        "id": "50369905-68ca-48d2-912d",
-        "name": "Stateside",
-        "artist": "PinkPantheress ft. Zara Larsson",
-    },
-]
 
 
 @cli.command()
@@ -204,9 +199,9 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
         f"[bold cyan]Total Saved Songs:[/] [white]{spotify_client.get_total_saved_songs()}[/]"
     )
     songs = fetch_songs()
-    gemini_songs = process_gemini_and_spotify(organize_by(), test_songs)
-    console.print(gemini_songs)
-
+    org_type = organize_by()
+    model_name = select_model()
+    process_gemini_and_spotify(org_type, songs, model_name)
 
 
 if __name__ == "__main__":

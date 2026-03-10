@@ -83,7 +83,7 @@ SONGS TO CATEGORIZE:
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
-def classify_library(song_list, prompt_template, batch_size=20):
+def classify_library(song_list, prompt_template, model_name="gemini-2.0-flash", batch_size=20, progress_callback=None):
     """Processes songs in batches to avoid AI freezing/timeouts."""
     all_playlists = {}
 
@@ -105,7 +105,7 @@ def classify_library(song_list, prompt_template, batch_size=20):
         for attempt in range(max_retries):
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=model_name,
                     contents=formatted_prompt,
                     config={
                         "response_mime_type": "application/json",
@@ -117,14 +117,21 @@ def classify_library(song_list, prompt_template, batch_size=20):
                     data = LibraryClassification.model_validate_json(response.text)
                     for p in data.playlists:
                         all_playlists.setdefault(p.name, []).extend(p.ids)
+                    
+                    if progress_callback:
+                        progress_callback(len(batch))
+                
                 break
 
             except Exception as e:
+                if "429" in str(e):
+                    print(f"\n🛑 Quota reached. Sleeping for 60s to reset... {e}")
+                    time.sleep(65)
+                    continue 
+                
                 if "503" in str(e) and attempt < max_retries - 1:
-                    print(
-                        f"⚠️ Server busy, retrying batch {i//batch_size + 1} (Attempt {attempt + 1})..."
-                    )
-                    time.sleep(2)
+                    print(f"⚠️ Server busy, retrying batch {i//batch_size + 1}...")
+                    time.sleep(5)
                     continue
                 raise e
 
@@ -135,7 +142,6 @@ def classify_library(song_list, prompt_template, batch_size=20):
             {"name": k, "ids": list(set(v))} for k, v in all_playlists.items()
         ]
     }
-
 
 if __name__ == "__main__":
     print("🧪 Testing Gemini Classification...")
