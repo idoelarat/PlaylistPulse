@@ -60,7 +60,7 @@ def all_saved_songs():
         response = requests.get(url, headers=headers)
 
         if response.status_code != 200:
-            break  # Stop if something goes wrong
+            break
 
         data = response.json()
         items = data.get("items", [])
@@ -70,9 +70,9 @@ def all_saved_songs():
             if track:
                 song_list.append(
                     {
-                        "artist": track["artists"][0]["name"],
                         "id": track["id"],
                         "name": track["name"],
+                        "artist": track["artists"][0]["name"],
                     }
                 )
 

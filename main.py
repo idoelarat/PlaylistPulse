@@ -11,6 +11,7 @@ from rich import box
 from dotenv import set_key, load_dotenv
 from auth import app as fastapi_app
 import spotify_client
+import gemini_tool
 
 ENV_FILE = ".env"
 
@@ -73,7 +74,7 @@ def organize_by():
 
 
 def fetch_songs():
-    with console.status("[bold yellow]Fetching your library...", spinner="bouncingBar"):
+    with console.status("[bold yellow]Fetching your library...", spinner="arc"):
         songs = spotify_client.all_saved_songs()
 
     if not isinstance(songs, list):
@@ -97,11 +98,50 @@ def fetch_songs():
         )
 
     console.print(table)
-    
+
     if len(songs) > 10:
         console.print(f"[italic]... plus [bold]{len(songs) - 10}[/] more tracks.[/]\n")
-    
-    return songs 
+
+    return songs
+
+
+def process_gemini_and_spotify(num: int, songs):
+    if num == 1:
+        status_msg = "[bold yellow]Organizing By Mood... Please Wait It might take time"
+        prompt = gemini_tool.PROMPT_TEMPLATE_MOOD
+    else:
+        status_msg = "[bold yellow]Organizing By Genre... Please Wait It might take time"
+        prompt = gemini_tool.PROMPT_TEMPLATE_GENERE
+
+    with console.status(status_msg, spinner="arc"):
+        res = gemini_tool.classify_library(songs, prompt)
+
+        count = len(songs)
+
+        console.print(f"[green]Successfully processed {count} songs![/green]")
+
+    return res
+
+
+test_songs = [
+    {
+        "id": "7ouMYWpwJ422jRcDASZB7P",
+        "name": "The Fate of Ophelia",
+        "artist": "Taylor Swift",
+    },
+    {"id": "4VqPOruhp5EdPBeR92t6lQ", "name": "I Just Might", "artist": "Bruno Mars"},
+    {"id": "2takcwOaAZWiXQijPHIx7B", "name": "Azizam", "artist": "Ed Sheeran"},
+    {
+        "id": "1dc4c347-a1db-32aa-b14f",
+        "name": "Beat Yourself Up",
+        "artist": "Charlie Puth",
+    },
+    {
+        "id": "50369905-68ca-48d2-912d",
+        "name": "Stateside",
+        "artist": "PinkPantheress ft. Zara Larsson",
+    },
+]
 
 
 @cli.command()
@@ -130,7 +170,7 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     print_big_banner()
     login_link(port, host)
     with console.status(
-        "[bold yellow]Waiting for Spotify authentication...", spinner="dots"
+        "[bold yellow]Waiting for Spotify authentication...", spinner="arc"
     ):
         while not os.path.exists(".tokens.json"):
             time.sleep(0.5)
@@ -146,8 +186,9 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     console.print(
         f"[bold cyan]Total Saved Songs:[/] [white]{spotify_client.get_total_saved_songs()}[/]"
     )
-    fetch_songs()
-    organize_by()
+    songs = fetch_songs()
+    gemini_songs = process_gemini_and_spotify(organize_by(), test_songs)
+    console.print(gemini_songs) 
 
 
 if __name__ == "__main__":
