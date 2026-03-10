@@ -6,6 +6,7 @@ import time
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+from rich.table import Table
 from rich import box
 from dotenv import set_key, load_dotenv
 from auth import app as fastapi_app
@@ -71,6 +72,38 @@ def organize_by():
         console.print("[red]Invalid choice. Please enter 1 or 2.[/red]")
 
 
+def fetch_songs():
+    with console.status("[bold yellow]Fetching your library...", spinner="bouncingBar"):
+        songs = spotify_client.all_saved_songs()
+
+    if not isinstance(songs, list):
+        console.print(
+            "[red]❌ Could not load songs. Please check your connection.[/red]"
+        )
+        return
+
+    table = Table(
+        title="Your Saved Library", show_header=True, header_style="bold magenta"
+    )
+    table.add_column("ID", style="dim", width=22)
+    table.add_column("Song Name", style="cyan")
+    table.add_column("Artist", style="white")
+
+    for s in songs[:10]:
+        table.add_row(
+            str(s.get("id", "N/A")),
+            str(s.get("name", "Unknown")),
+            str(s.get("artist", "Unknown")),
+        )
+
+    console.print(table)
+    
+    if len(songs) > 10:
+        console.print(f"[italic]... plus [bold]{len(songs) - 10}[/] more tracks.[/]\n")
+    
+    return songs 
+
+
 @cli.command()
 def start(port: int = 8888, host: str = "127.0.0.1"):
     """
@@ -79,7 +112,7 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     console.clear()
     print_big_banner()
 
-    if typer.confirm("Want to change tokens?",default=False):
+    if typer.confirm("Want to change tokens?", default=False):
         set_env()
 
     if os.path.exists(".tokens.json"):
@@ -113,6 +146,7 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
     console.print(
         f"[bold cyan]Total Saved Songs:[/] [white]{spotify_client.get_total_saved_songs()}[/]"
     )
+    fetch_songs()
     organize_by()
 
 
