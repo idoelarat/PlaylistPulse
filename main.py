@@ -172,7 +172,7 @@ def start(port: int = 8888, host: str = "127.0.0.1"):
 
     proc = multiprocessing.Process(
         target=uvicorn.run,
-        args=(fastapi_app,),
+        args=("auth:app",),
         kwargs={"host": host, "port": port, "log_level": "error"},
         daemon=True,
     )
